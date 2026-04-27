@@ -1,85 +1,176 @@
-import { View, Text, FlatList, TouchableOpacity } from 'react-native';
+import { useMemo, useState } from 'react';
+import { View, Text, FlatList, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { mockNotifications } from '@/data/mock-notifications';
 import { formatDate } from '@/utils/format';
 import { Notification as AppNotification } from '@/types';
+import { Tones } from '@/constants/colors';
+import { getNotificationTone, getNotificationIcon } from '@/utils/tones';
+import { Card } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
 
-type IconName = React.ComponentProps<typeof Ionicons>['name'];
+function groupByDate(items: AppNotification[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
 
-export default function NotificationsScreen() {
-  const getTypeConfig = (
-    type: AppNotification['type'],
-  ): { icon: IconName; color: string; bg: string } => {
-    switch (type) {
-      case 'OVERDUE_WARNING':
-        return { icon: 'warning', color: '#EF4444', bg: '#FEE2E2' };
-      case 'INVOICE':
-        return { icon: 'receipt', color: '#F59E0B', bg: '#FEF3C7' };
-      case 'PAYMENT':
-        return { icon: 'checkmark-circle', color: '#00A651', bg: '#E8F5E9' };
-      case 'PRICE_CHANGE':
-        return { icon: 'trending-up', color: '#3B82F6', bg: '#DBEAFE' };
-      case 'CONTRACT':
-        return { icon: 'document-text', color: '#00A651', bg: '#E8F5E9' };
-      case 'INFO':
-      default:
-        return { icon: 'information-circle', color: '#6B7280', bg: '#F5F5F5' };
-    }
+  const groups: Record<string, AppNotification[]> = {
+    Dnes: [],
+    Včera: [],
+    'Tento týden': [],
+    Starší: [],
   };
 
-  const renderNotification = ({ item }: { item: AppNotification }) => {
-    const config = getTypeConfig(item.type);
+  items.forEach((n) => {
+    const d = new Date(n.date);
+    d.setHours(0, 0, 0, 0);
+    if (d.getTime() === today.getTime()) groups['Dnes'].push(n);
+    else if (d.getTime() === yesterday.getTime()) groups['Včera'].push(n);
+    else if (d >= weekAgo) groups['Tento týden'].push(n);
+    else groups['Starší'].push(n);
+  });
+
+  return Object.entries(groups)
+    .filter(([, list]) => list.length > 0)
+    .map(([title, data]) => ({ title, data }));
+}
+
+type Row =
+  | { kind: 'header'; title: string }
+  | { kind: 'item'; item: AppNotification };
+
+export default function NotificationsScreen() {
+  const [readSet, setReadSet] = useState<Set<string>>(
+    new Set(mockNotifications.filter((n) => n.read).map((n) => n.id)),
+  );
+
+  const items = useMemo(
+    () => mockNotifications.map((n) => ({ ...n, read: readSet.has(n.id) })),
+    [readSet],
+  );
+  const unreadCount = items.filter((n) => !n.read).length;
+
+  const rows: Row[] = useMemo(() => {
+    const groups = groupByDate(items);
+    const out: Row[] = [];
+    groups.forEach((g) => {
+      out.push({ kind: 'header', title: g.title });
+      g.data.forEach((item) => out.push({ kind: 'item', item }));
+    });
+    return out;
+  }, [items]);
+
+  const markAllRead = () => {
+    setReadSet(new Set(mockNotifications.map((n) => n.id)));
+  };
+  const toggleRead = (id: string) => {
+    setReadSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const renderItem = (row: Row) => {
+    if (row.kind === 'header') {
+      return (
+        <View className="px-5 pt-4 pb-2">
+          <Text className="text-xs font-bold text-ink-muted uppercase tracking-wider">
+            {row.title}
+          </Text>
+        </View>
+      );
+    }
+    const n = row.item;
+    const tone = getNotificationTone(n.type);
+    const c = Tones[tone];
     return (
-      <View
-        className="bg-white rounded-xl p-4 mx-5 mb-2 flex-row items-start shadow-sm"
-        style={{ opacity: item.read ? 0.7 : 1 }}
-      >
-        <View
-          className="w-10 h-10 rounded-full items-center justify-center mr-3 mt-0.5"
-          style={{ backgroundColor: config.bg }}
-        >
-          <Ionicons name={config.icon} size={20} color={config.color} />
-        </View>
-        <View className="flex-1">
-          <View className="flex-row items-center justify-between">
-            <Text
-              className={`text-sm ${
-                !item.read ? 'font-semibold' : 'font-medium'
-              } text-[#1B1B1B] flex-1`}
-            >
-              {item.title}
-            </Text>
-            {!item.read && (
-              <View className="w-2.5 h-2.5 rounded-full bg-[#00A651] ml-2" />
-            )}
-          </View>
-          <Text className="text-xs text-[#6B7280] mt-1 leading-4">
-            {item.message}
-          </Text>
-          <Text className="text-[11px] text-[#D1D5DB] mt-2">
-            {formatDate(item.date)}
-          </Text>
-        </View>
-      </View>
+      <Pressable onPress={() => toggleRead(n.id)} className="mx-5 mb-2">
+        {({ pressed }) => (
+          <Card padding="md" style={{ opacity: pressed ? 0.85 : 1 }}>
+            <View className="flex-row items-start">
+              <View
+                className="w-10 h-10 rounded-full items-center justify-center mr-3"
+                style={{ backgroundColor: c.bg }}
+              >
+                <Ionicons
+                  name={getNotificationIcon(n.type)}
+                  size={20}
+                  color={c.solid}
+                />
+              </View>
+              <View className="flex-1 min-w-0">
+                <View className="flex-row items-center">
+                  <Text
+                    className={`text-sm flex-1 ${
+                      n.read
+                        ? 'font-medium text-ink-muted'
+                        : 'font-bold text-ink'
+                    }`}
+                    numberOfLines={1}
+                  >
+                    {n.title}
+                  </Text>
+                  {!n.read && (
+                    <View className="w-2 h-2 rounded-full bg-mnd-green ml-2" />
+                  )}
+                </View>
+                <Text
+                  className={`text-xs mt-1 ${
+                    n.read ? 'text-ink-subtle' : 'text-ink-muted'
+                  }`}
+                  numberOfLines={2}
+                >
+                  {n.message}
+                </Text>
+                <Text className="text-2xs text-ink-subtle mt-2">
+                  {formatDate(n.date)}
+                </Text>
+              </View>
+            </View>
+          </Card>
+        )}
+      </Pressable>
     );
   };
 
   return (
-    <View className="flex-1 bg-[#F5F5F5]">
+    <View className="flex-1 bg-surface">
+      {unreadCount > 0 && (
+        <View className="px-5 pt-3 flex-row items-center justify-between">
+          <Text className="text-xs text-ink-muted">
+            {unreadCount} nepřečteno
+          </Text>
+          <Pressable onPress={markAllRead} hitSlop={8}>
+            {({ pressed }) => (
+              <Text
+                className="text-sm font-semibold text-mnd-green"
+                style={{ opacity: pressed ? 0.6 : 1 }}
+              >
+                Označit vše jako přečtené
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      )}
+
       <FlatList
-        data={mockNotifications}
-        keyExtractor={(item) => item.id}
-        renderItem={renderNotification}
-        contentContainerStyle={{ paddingTop: 12, paddingBottom: 20 }}
+        data={rows}
+        keyExtractor={(r, i) =>
+          r.kind === 'header' ? `h-${r.title}-${i}` : `i-${r.item.id}`
+        }
+        renderItem={({ item }) => renderItem(item)}
+        contentContainerStyle={{ paddingBottom: 32 }}
         ListEmptyComponent={
-          <View className="items-center py-12">
-            <Ionicons
-              name="notifications-off-outline"
-              size={48}
-              color="#D1D5DB"
-            />
-            <Text className="text-[#6B7280] mt-3">Žádná upozornění</Text>
-          </View>
+          <EmptyState
+            icon="notifications-off-outline"
+            title="Žádná upozornění"
+            message="Až vám něco důležitého pošleme, najdete to tady."
+          />
         }
       />
     </View>

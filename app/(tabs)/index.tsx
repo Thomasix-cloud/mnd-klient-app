@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { useMemo } from 'react';
+import { View, Text, ScrollView, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,330 +12,352 @@ import { Colors } from '@/constants/colors';
 import {
   formatCurrency,
   getGreeting,
-  getEnergyTypeIcon,
   getEnergyTypeLabel,
 } from '@/utils/format';
+import { Alert } from '@/components/ui/Alert';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { ConsumptionChart } from '@/components/ui/ConsumptionChart';
+import { EnergyAvatar } from '@/components/ui/EnergyAvatar';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+
+type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
+
+interface QuickAction {
+  icon: IoniconName;
+  label: string;
+  tone: 'brand' | 'info' | 'warning' | 'neutral';
+  route?: string;
+}
+
+const QUICK_ACTIONS: QuickAction[] = [
+  {
+    icon: 'speedometer-outline',
+    label: 'Samoodečet',
+    tone: 'brand',
+  },
+  {
+    icon: 'cash-outline',
+    label: 'Změnit zálohy',
+    tone: 'info',
+  },
+  {
+    icon: 'calculator-outline',
+    label: 'Kalkulačka',
+    tone: 'warning',
+    route: '/calculator',
+  },
+  {
+    icon: 'call-outline',
+    label: 'Kontakt',
+    tone: 'neutral',
+  },
+];
 
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((s) => s.user);
 
+  const overdueInvoices = mockInvoices.filter((i) => i.status === 'OVERDUE');
   const unpaidInvoices = mockInvoices.filter(
     (i) => i.status === 'UNPAID' || i.status === 'OVERDUE',
   );
-  const overdueInvoices = mockInvoices.filter((i) => i.status === 'OVERDUE');
-  const totalUnpaid = unpaidInvoices.reduce((sum, i) => sum + i.amount, 0);
-  const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  const totalUnpaid = unpaidInvoices.reduce((s, i) => s + i.amount, 0);
+
+  const currentMonth = `${new Date().getFullYear()}-${String(
+    new Date().getMonth() + 1,
+  ).padStart(2, '0')}`;
   const totalMonthly = mockInvoices
     .filter(
       (i) => i.type === 'ADVANCE' && i.period.from.startsWith(currentMonth),
     )
-    .reduce((sum, i) => sum + i.amount, 0);
+    .reduce((s, i) => s + i.amount, 0);
 
   const unreadNotifications = mockNotifications.filter((n) => !n.read);
 
-  // Last 7 days consumption for sp1
+  // Consumption: current 7 days vs previous 7 days
   const sp1Consumption = mockConsumption.find((c) => c.supplyPointId === 'sp1');
-  const last7Days = sp1Consumption?.daily.slice(-7) ?? [];
+  const { current7, prev7 } = useMemo(() => {
+    const all = sp1Consumption?.daily ?? [];
+    return {
+      current7: all.slice(-7),
+      prev7: all.slice(-14, -7),
+    };
+  }, [sp1Consumption]);
+
+  const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
 
   return (
     <ScrollView
-      className="flex-1 bg-[#F5F5F5]"
-      contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: 20 }}
+      className="flex-1 bg-surface"
+      contentContainerStyle={{
+        paddingTop: insets.top + 8,
+        paddingBottom: 32,
+      }}
+      showsVerticalScrollIndicator={false}
     >
       {/* Header */}
-      <View className="px-5 flex-row items-center justify-between mb-4">
-        <View>
-          <Text className="text-sm text-[#6B7280]">{getGreeting()}</Text>
-          <Text className="text-2xl font-bold text-[#1B1B1B]">
-            {user?.firstName} {user?.lastName}
-          </Text>
+      <View className="px-5 flex-row items-center justify-between mb-5">
+        <View className="flex-row items-center flex-1">
+          <View
+            className="w-11 h-11 rounded-full items-center justify-center mr-3"
+            style={{ backgroundColor: Colors.primaryLight }}
+          >
+            <Text className="text-base font-bold text-mnd-green">
+              {initials}
+            </Text>
+          </View>
+          <View className="flex-1 min-w-0">
+            <Text className="text-xs text-ink-muted">{getGreeting()},</Text>
+            <Text className="text-lg font-bold text-ink" numberOfLines={1}>
+              {user?.firstName} {user?.lastName}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity
-          className="relative"
+        <Pressable
+          hitSlop={8}
           onPress={() => router.push('/notifications')}
+          className="relative w-11 h-11 rounded-full items-center justify-center"
+          style={{ backgroundColor: Colors.surfaceSubtle }}
         >
-          <Ionicons name="notifications-outline" size={26} color="#1B1B1B" />
+          <Ionicons
+            name="notifications-outline"
+            size={22}
+            color={Colors.text}
+          />
           {unreadNotifications.length > 0 && (
-            <View className="absolute -top-1 -right-1 bg-[#EF4444] rounded-full w-5 h-5 items-center justify-center">
-              <Text className="text-white text-xs font-bold">
+            <View className="absolute top-1.5 right-1.5 bg-danger rounded-full min-w-[18px] h-[18px] px-1 items-center justify-center border-2 border-white">
+              <Text className="text-white text-[10px] font-bold">
                 {unreadNotifications.length}
               </Text>
             </View>
           )}
-        </TouchableOpacity>
+        </Pressable>
       </View>
 
-      {/* Overdue Warning Banner */}
+      {/* ========== ALERTS ========== */}
       {overdueInvoices.length > 0 && (
-        <TouchableOpacity
-          className="mx-5 mb-4 bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-4 flex-row items-center"
-          onPress={() =>
-            router.push(`/invoices/${overdueInvoices[0].id}` as any)
-          }
-        >
-          <View className="w-10 h-10 rounded-full bg-[#EF4444] items-center justify-center mr-3">
-            <Ionicons name="warning" size={20} color="white" />
-          </View>
-          <View className="flex-1">
-            <Text className="text-[#EF4444] font-semibold text-sm">
-              Neuhrazená platba po splatnosti
-            </Text>
-            <Text className="text-[#6B7280] text-xs mt-0.5">
-              {formatCurrency(
-                overdueInvoices.reduce((s, i) => s + i.amount, 0),
-              )}{' '}
-              — klikněte pro detail
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color="#EF4444" />
-        </TouchableOpacity>
+        <View className="px-5 mb-5">
+          <Alert
+            tone="danger"
+            icon="warning"
+            title="Faktura po splatnosti"
+            message={`${formatCurrency(
+              overdueInvoices.reduce((s, i) => s + i.amount, 0),
+            )} — klepněte pro detail`}
+            onPress={() =>
+              router.push(`/invoices/${overdueInvoices[0].id}` as any)
+            }
+          />
+        </View>
       )}
 
-      {/* Summary Cards */}
-      <View className="flex-row px-5 gap-3 mb-5">
-        <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
-          <View className="w-9 h-9 rounded-full bg-[#E8F5E9] items-center justify-center mb-2">
-            <Ionicons name="wallet-outline" size={18} color="#00A651" />
-          </View>
-          <Text className="text-xs text-[#6B7280]">Měsíční zálohy</Text>
-          <Text className="text-lg font-bold text-[#1B1B1B]">
-            {formatCurrency(totalMonthly)}
+      {/* ========== KEY METRICS ========== */}
+      <View className="px-5 mb-6">
+        <Card padding="lg">
+          <Text className="text-2xs text-ink-muted uppercase tracking-wider mb-1">
+            K úhradě tento měsíc
           </Text>
-        </View>
-        <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
-          <View className="w-9 h-9 rounded-full bg-[#FEE2E2] items-center justify-center mb-2">
-            <Ionicons name="time-outline" size={18} color="#EF4444" />
+          <View className="flex-row items-baseline">
+            <Text
+              className={`text-3xl font-bold ${
+                totalUnpaid > 0 ? 'text-danger-text' : 'text-ink'
+              }`}
+            >
+              {formatCurrency(totalUnpaid)}
+            </Text>
           </View>
-          <Text className="text-xs text-[#6B7280]">K úhradě</Text>
-          <Text className="text-lg font-bold text-[#EF4444]">
-            {formatCurrency(totalUnpaid)}
-          </Text>
-        </View>
-        <View className="flex-1 bg-white rounded-2xl p-4 shadow-sm">
-          <View className="w-9 h-9 rounded-full bg-[#DBEAFE] items-center justify-center mb-2">
-            <Ionicons name="location-outline" size={18} color="#3B82F6" />
+          <View className="flex-row mt-4 pt-4 border-t border-line-subtle">
+            <View className="flex-1 pr-3 border-r border-line-subtle">
+              <Text className="text-2xs text-ink-muted">Měsíční zálohy</Text>
+              <Text className="text-sm font-bold text-ink mt-1">
+                {formatCurrency(totalMonthly)}
+              </Text>
+            </View>
+            <View className="flex-1 pl-3">
+              <Text className="text-2xs text-ink-muted">Odběrná místa</Text>
+              <Text className="text-sm font-bold text-ink mt-1">
+                {mockSupplyPoints.length} aktivní
+              </Text>
+            </View>
           </View>
-          <Text className="text-xs text-[#6B7280]">Odběrná místa</Text>
-          <Text className="text-lg font-bold text-[#1B1B1B]">
-            {mockSupplyPoints.length}
-          </Text>
+        </Card>
+      </View>
+
+      {/* ========== QUICK ACTIONS (2x2) ========== */}
+      <View className="px-5 mb-6">
+        <SectionHeader title="Rychlé akce" />
+        <View className="flex-row flex-wrap -mx-1.5">
+          {QUICK_ACTIONS.map((action, i) => {
+            const palette = {
+              brand: { bg: '#E8F5E9', icon: Colors.primary },
+              info: { bg: '#DBEAFE', icon: Colors.electricity },
+              warning: { bg: '#FEF3C7', icon: Colors.gas },
+              neutral: { bg: '#F1F5F9', icon: Colors.gray },
+            }[action.tone];
+            return (
+              <View key={i} className="w-1/2 px-1.5 mb-3">
+                <Pressable
+                  onPress={() => {
+                    if (action.route) router.push(action.route as any);
+                  }}
+                >
+                  {({ pressed }) => (
+                    <Card padding="md" style={{ opacity: pressed ? 0.85 : 1 }}>
+                      <View className="flex-row items-center">
+                        <View
+                          className="w-11 h-11 rounded-xl items-center justify-center mr-3"
+                          style={{ backgroundColor: palette.bg }}
+                        >
+                          <Ionicons
+                            name={action.icon}
+                            size={22}
+                            color={palette.icon}
+                          />
+                        </View>
+                        <Text
+                          className="text-sm font-semibold text-ink flex-1"
+                          numberOfLines={1}
+                        >
+                          {action.label}
+                        </Text>
+                      </View>
+                    </Card>
+                  )}
+                </Pressable>
+              </View>
+            );
+          })}
         </View>
       </View>
 
-      {/* Supply Point Tiles */}
-      <View className="px-5 mb-5">
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-base font-semibold text-[#1B1B1B]">
-            Odběrná místa
-          </Text>
-          <TouchableOpacity onPress={() => router.push('/supply-points')}>
-            <Text className="text-sm text-[#00A651] font-medium">
-              Zobrazit vše
-            </Text>
-          </TouchableOpacity>
-        </View>
+      {/* ========== CONSUMPTION ========== */}
+      <View className="px-5 mb-6">
+        <SectionHeader
+          title="Spotřeba elektřiny"
+          actionLabel="Detail"
+          onActionPress={() => router.push('/supply-points/sp1' as any)}
+        />
+        {current7.length > 0 && (
+          <ConsumptionChart
+            data={current7}
+            previous={prev7.length === 7 ? prev7 : undefined}
+            unit="kWh"
+          />
+        )}
+      </View>
+
+      {/* ========== SUPPLY POINTS ========== */}
+      <View className="px-5 mb-6">
+        <SectionHeader
+          title="Odběrná místa"
+          actionLabel="Vše"
+          onActionPress={() => router.push('/supply-points')}
+        />
         {mockSupplyPoints.map((sp) => (
-          <TouchableOpacity
+          <Pressable
             key={sp.id}
-            className="bg-white rounded-2xl p-4 mb-3 flex-row items-center shadow-sm"
             onPress={() => router.push(`/supply-points/${sp.id}`)}
+            className="mb-3"
           >
-            <View
-              className="w-11 h-11 rounded-full items-center justify-center mr-3"
-              style={{
-                backgroundColor:
-                  sp.type === 'ELECTRICITY' ? '#DBEAFE' : '#FEF3C7',
-              }}
-            >
-              <Ionicons
-                name={getEnergyTypeIcon(sp.type)}
-                size={22}
-                color={
-                  sp.type === 'ELECTRICITY' ? Colors.electricity : Colors.gas
-                }
-              />
-            </View>
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-[#1B1B1B]">
-                {getEnergyTypeLabel(sp.type)}
-              </Text>
-              <Text className="text-xs text-[#6B7280]">
-                {sp.address.street}, {sp.address.city}
-              </Text>
-            </View>
-            <View className="items-end">
-              <View className="bg-[#E8F5E9] rounded-full px-2 py-0.5">
-                <Text className="text-xs text-[#00A651] font-medium">
-                  Aktivní
-                </Text>
-              </View>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={16}
-              color="#D1D5DB"
-              style={{ marginLeft: 8 }}
-            />
-          </TouchableOpacity>
+            {({ pressed }) => (
+              <Card padding="md" style={{ opacity: pressed ? 0.85 : 1 }}>
+                <View className="flex-row items-center">
+                  <EnergyAvatar type={sp.type} size="md" />
+                  <View className="flex-1 ml-3 min-w-0">
+                    <Text
+                      className="text-sm font-semibold text-ink"
+                      numberOfLines={1}
+                    >
+                      {getEnergyTypeLabel(sp.type)}
+                    </Text>
+                    <Text
+                      className="text-xs text-ink-muted mt-0.5"
+                      numberOfLines={1}
+                    >
+                      {sp.address.street}, {sp.address.city}
+                    </Text>
+                  </View>
+                  <Badge label="Aktivní" tone="success" />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={16}
+                    color={Colors.grayMedium}
+                    style={{ marginLeft: 8 }}
+                  />
+                </View>
+              </Card>
+            )}
+          </Pressable>
         ))}
       </View>
 
-      {/* Consumption Mini Chart (simplified) */}
-      <View className="px-5 mb-5">
-        <Text className="text-base font-semibold text-[#1B1B1B] mb-3">
-          Spotřeba elektřiny — 7 dní
-        </Text>
-        <View className="bg-white rounded-2xl p-4 shadow-sm">
-          <View className="flex-row items-end justify-between h-24">
-            {last7Days.map((d, i) => {
-              const maxVal = Math.max(...last7Days.map((x) => x.value));
-              const height = maxVal > 0 ? (d.value / maxVal) * 80 : 0;
-              const dayLabel = new Date(d.date).toLocaleDateString('cs-CZ', {
-                weekday: 'short',
-              });
-              return (
-                <View key={i} className="items-center flex-1">
-                  <Text className="text-[10px] text-[#6B7280] mb-1">
-                    {d.value}
+      {/* ========== RECENT NOTIFICATIONS ========== */}
+      <View className="px-5">
+        <SectionHeader
+          title="Poslední upozornění"
+          actionLabel="Vše"
+          onActionPress={() => router.push('/notifications')}
+        />
+        {mockNotifications.slice(0, 3).map((n) => {
+          const tone =
+            n.type === 'OVERDUE_WARNING'
+              ? 'danger'
+              : n.type === 'PAYMENT'
+                ? 'success'
+                : n.type === 'PRICE_CHANGE'
+                  ? 'info'
+                  : 'warning';
+          const palette = {
+            danger: { bg: '#FEE2E2', icon: Colors.red },
+            success: { bg: '#E8F5E9', icon: Colors.primary },
+            info: { bg: '#DBEAFE', icon: Colors.blue },
+            warning: { bg: '#FEF3C7', icon: Colors.orange },
+          }[tone];
+          const iconName: IoniconName =
+            n.type === 'OVERDUE_WARNING'
+              ? 'warning'
+              : n.type === 'PAYMENT'
+                ? 'checkmark-circle'
+                : n.type === 'PRICE_CHANGE'
+                  ? 'trending-up'
+                  : n.type === 'INVOICE'
+                    ? 'receipt'
+                    : 'information-circle';
+          return (
+            <Card key={n.id} padding="md" className="mb-2">
+              <View className="flex-row items-start">
+                <View
+                  className="w-9 h-9 rounded-full items-center justify-center mr-3"
+                  style={{ backgroundColor: palette.bg }}
+                >
+                  <Ionicons name={iconName} size={18} color={palette.icon} />
+                </View>
+                <View className="flex-1">
+                  <Text
+                    className={`text-sm ${
+                      n.read
+                        ? 'font-medium text-ink-muted'
+                        : 'font-semibold text-ink'
+                    }`}
+                    numberOfLines={1}
+                  >
+                    {n.title}
                   </Text>
-                  <View
-                    className="w-6 rounded-t-md bg-[#00A651]"
-                    style={{ height: Math.max(height, 4) }}
-                  />
-                  <Text className="text-[10px] text-[#6B7280] mt-1">
-                    {dayLabel}
+                  <Text
+                    className="text-xs text-ink-muted mt-0.5"
+                    numberOfLines={2}
+                  >
+                    {n.message}
                   </Text>
                 </View>
-              );
-            })}
-          </View>
-          <Text className="text-xs text-[#6B7280] text-center mt-2">
-            kWh/den • Koněvova 123
-          </Text>
-        </View>
-      </View>
-
-      {/* Quick Actions */}
-      <View className="px-5 mb-5">
-        <Text className="text-base font-semibold text-[#1B1B1B] mb-3">
-          Rychlé akce
-        </Text>
-        <View className="flex-row gap-3">
-          {(
-            [
-              {
-                icon: 'speedometer-outline' as const,
-                label: 'Samoodečet',
-                color: '#00A651',
-              },
-              {
-                icon: 'cash-outline' as const,
-                label: 'Změnit zálohy',
-                color: '#3B82F6',
-              },
-              {
-                icon: 'calculator-outline' as const,
-                label: 'Kalkulačka',
-                color: '#F59E0B',
-                route: '/calculator',
-              },
-              {
-                icon: 'call-outline' as const,
-                label: 'Kontakt',
-                color: '#6B7280',
-              },
-            ] as const
-          ).map((action, i) => (
-            <TouchableOpacity
-              key={i}
-              className="flex-1 bg-white rounded-2xl p-3 items-center shadow-sm"
-              onPress={() => {
-                if ('route' in action && action.route)
-                  router.push(action.route as any);
-              }}
-            >
-              <View
-                className="w-10 h-10 rounded-full items-center justify-center mb-1.5"
-                style={{ backgroundColor: action.color + '15' }}
-              >
-                <Ionicons name={action.icon} size={20} color={action.color} />
+                {!n.read && (
+                  <View className="w-2 h-2 rounded-full bg-mnd-green mt-1.5 ml-2" />
+                )}
               </View>
-              <Text className="text-[11px] text-[#1B1B1B] font-medium text-center">
-                {action.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Recent Notifications */}
-      <View className="px-5">
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-base font-semibold text-[#1B1B1B]">
-            Poslední upozornění
-          </Text>
-          <TouchableOpacity onPress={() => router.push('/notifications')}>
-            <Text className="text-sm text-[#00A651] font-medium">Vše</Text>
-          </TouchableOpacity>
-        </View>
-        {mockNotifications.slice(0, 3).map((n) => (
-          <View
-            key={n.id}
-            className="bg-white rounded-xl p-3.5 mb-2 flex-row items-start shadow-sm"
-          >
-            <View
-              className="w-8 h-8 rounded-full items-center justify-center mr-3 mt-0.5"
-              style={{
-                backgroundColor:
-                  n.type === 'OVERDUE_WARNING'
-                    ? '#FEE2E2'
-                    : n.type === 'INVOICE'
-                      ? '#FEF3C7'
-                      : n.type === 'PRICE_CHANGE'
-                        ? '#DBEAFE'
-                        : '#E8F5E9',
-              }}
-            >
-              <Ionicons
-                name={
-                  n.type === 'OVERDUE_WARNING'
-                    ? 'warning'
-                    : n.type === 'INVOICE'
-                      ? 'receipt'
-                      : n.type === 'PRICE_CHANGE'
-                        ? 'trending-up'
-                        : 'information-circle'
-                }
-                size={16}
-                color={
-                  n.type === 'OVERDUE_WARNING'
-                    ? '#EF4444'
-                    : n.type === 'INVOICE'
-                      ? '#F59E0B'
-                      : n.type === 'PRICE_CHANGE'
-                        ? '#3B82F6'
-                        : '#00A651'
-                }
-              />
-            </View>
-            <View className="flex-1">
-              <Text
-                className={`text-sm ${
-                  !n.read ? 'font-semibold' : 'font-medium'
-                } text-[#1B1B1B]`}
-              >
-                {n.title}
-              </Text>
-              <Text className="text-xs text-[#6B7280] mt-0.5" numberOfLines={2}>
-                {n.message}
-              </Text>
-            </View>
-            {!n.read && (
-              <View className="w-2 h-2 rounded-full bg-[#00A651] mt-1.5" />
-            )}
-          </View>
-        ))}
+            </Card>
+          );
+        })}
       </View>
     </ScrollView>
   );
