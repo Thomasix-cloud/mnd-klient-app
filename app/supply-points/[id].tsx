@@ -1,17 +1,36 @@
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useMemo } from 'react';
+import { View, Text, ScrollView, Pressable } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { mockSupplyPoints } from '@/data/mock-supply-points';
 import { mockContracts } from '@/data/mock-contracts';
 import { mockConsumption } from '@/data/mock-consumption';
 import { mockAdvancePayments } from '@/data/mock-advance-payments';
-import { Colors } from '@/constants/colors';
-import {
-  formatCurrency,
-  formatEAN,
-  getEnergyTypeIcon,
-  getEnergyTypeLabel,
-} from '@/utils/format';
+import { Colors, Tones } from '@/constants/colors';
+import { formatCurrency, formatEAN, getEnergyTypeLabel } from '@/utils/format';
+import { Card } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { InfoRow } from '@/components/ui/InfoRow';
+import { SectionHeader } from '@/components/ui/SectionHeader';
+import { EnergyAvatar } from '@/components/ui/EnergyAvatar';
+import { Alert } from '@/components/ui/Alert';
+import { EmptyState } from '@/components/ui/EmptyState';
+
+const MONTH_NAMES = [
+  'Led',
+  'Úno',
+  'Bře',
+  'Dub',
+  'Kvě',
+  'Čer',
+  'Čvc',
+  'Srp',
+  'Zář',
+  'Říj',
+  'Lis',
+  'Pro',
+];
 
 export default function SupplyPointDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -26,210 +45,307 @@ export default function SupplyPointDetailScreen() {
     ? mockAdvancePayments.find((a) => a.supplyPointId === sp.id)
     : undefined;
 
+  const insights = useMemo(() => {
+    if (!consumption || consumption.monthly.length < 4) return null;
+    const last = consumption.monthly[consumption.monthly.length - 1];
+    const prev3 =
+      consumption.monthly.slice(-4, -1).reduce((s, m) => s + m.value, 0) / 3;
+    const yoyIdx = consumption.monthly.length - 13;
+    const yoy = yoyIdx >= 0 ? consumption.monthly[yoyIdx] : null;
+    const change = prev3 > 0 ? ((last.value - prev3) / prev3) * 100 : 0;
+    const yoyChange =
+      yoy && yoy.value > 0
+        ? ((last.value - yoy.value) / yoy.value) * 100
+        : null;
+    return { last, prev3, change, yoyChange };
+  }, [consumption]);
+
   if (!sp) {
     return (
-      <View className="flex-1 items-center justify-center bg-[#F5F5F5]">
-        <Text className="text-[#6B7280]">Odběrné místo nenalezeno</Text>
+      <View className="flex-1 bg-surface">
+        <EmptyState
+          icon="alert-circle-outline"
+          title="Odběrné místo nenalezeno"
+        />
       </View>
     );
   }
 
-  const advanceColor =
+  const advTone =
     advance?.status === 'OPTIMAL'
-      ? '#00A651'
+      ? 'success'
       : advance?.status === 'TOO_LOW'
-        ? '#EF4444'
-        : '#F59E0B';
-
-  const advanceLabel =
+        ? 'danger'
+        : 'warning';
+  const advLabel =
     advance?.status === 'OPTIMAL'
-      ? 'Optimální nastavení'
+      ? 'Optimální'
       : advance?.status === 'TOO_LOW'
-        ? 'Zálohy jsou příliš nízké'
-        : 'Zálohy jsou příliš vysoké';
+        ? 'Příliš nízké'
+        : 'Příliš vysoké';
+  const advPalette = Tones[advTone];
 
-  const advanceBg =
-    advance?.status === 'OPTIMAL'
-      ? '#E8F5E9'
-      : advance?.status === 'TOO_LOW'
-        ? '#FEE2E2'
-        : '#FEF3C7';
-
-  // Monthly consumption chart
-  const monthlyData = consumption?.monthly ?? [];
-  const maxMonthly = Math.max(...monthlyData.map((m) => m.value), 1);
+  const monthly = consumption?.monthly ?? [];
+  const maxMonthly = Math.max(...monthly.map((m) => m.value), 1);
+  const energyColor =
+    sp.type === 'ELECTRICITY' ? Colors.electricity : Colors.gas;
 
   return (
-    <ScrollView className="flex-1 bg-[#F5F5F5]">
-      {/* Header */}
-      <View className="bg-white mx-5 mt-4 rounded-2xl p-5 shadow-sm">
-        <View className="flex-row items-center mb-3">
-          <View
-            className="w-14 h-14 rounded-full items-center justify-center mr-4"
-            style={{
-              backgroundColor:
-                sp.type === 'ELECTRICITY' ? '#DBEAFE' : '#FEF3C7',
-            }}
-          >
-            <Ionicons
-              name={getEnergyTypeIcon(sp.type)}
-              size={28}
-              color={
-                sp.type === 'ELECTRICITY' ? Colors.electricity : Colors.gas
-              }
+    <ScrollView
+      className="flex-1 bg-surface"
+      contentContainerStyle={{ paddingBottom: 32 }}
+    >
+      {/* Hero */}
+      <View className="px-5 mt-4">
+        <Card padding="lg">
+          <View className="flex-row items-center mb-4">
+            <EnergyAvatar type={sp.type} size="lg" />
+            <View className="flex-1 ml-3 min-w-0">
+              <Text className="text-lg font-bold text-ink">
+                {getEnergyTypeLabel(sp.type)}
+              </Text>
+              <Text className="text-sm text-ink-muted" numberOfLines={1}>
+                {sp.address.street}, {sp.address.postalCode} {sp.address.city}
+              </Text>
+            </View>
+            <Badge label="Aktivní" tone="success" />
+          </View>
+          <View className="border-t border-line-subtle pt-1">
+            <InfoRow
+              label={sp.type === 'ELECTRICITY' ? 'EAN' : 'EIC'}
+              value={formatEAN(sp.identifier)}
+              icon="finger-print-outline"
+            />
+            <InfoRow
+              label="Číslo smlouvy"
+              value={sp.contractNumber}
+              icon="document-outline"
+            />
+            <InfoRow
+              label="Ceník"
+              value={contract?.pricePlan ?? '—'}
+              icon="pricetag-outline"
+              withDivider={false}
             />
           </View>
-          <View className="flex-1">
-            <Text className="text-lg font-bold text-[#1B1B1B]">
-              {getEnergyTypeLabel(sp.type)}
-            </Text>
-            <Text className="text-sm text-[#6B7280]">
-              {sp.address.street}, {sp.address.postalCode} {sp.address.city}
-            </Text>
-          </View>
-          <View className="bg-[#E8F5E9] rounded-full px-2.5 py-1">
-            <Text className="text-xs text-[#00A651] font-medium">Aktivní</Text>
-          </View>
-        </View>
-
-        {[
-          {
-            label: sp.type === 'ELECTRICITY' ? 'EAN' : 'EIC',
-            value: formatEAN(sp.identifier),
-          },
-          { label: 'Číslo smlouvy', value: sp.contractNumber },
-          { label: 'Ceník', value: contract?.pricePlan ?? '-' },
-        ].map((row, i) => (
-          <View
-            key={i}
-            className="flex-row justify-between py-2 border-b border-[#F5F5F5]"
-          >
-            <Text className="text-sm text-[#6B7280]">{row.label}</Text>
-            <Text className="text-sm font-medium text-[#1B1B1B] max-w-[60%] text-right">
-              {row.value}
-            </Text>
-          </View>
-        ))}
+        </Card>
       </View>
 
-      {/* Advance Payment "Budík" */}
-      {advance && (
-        <View className="bg-white mx-5 mt-4 rounded-2xl p-5 shadow-sm">
-          <Text className="text-sm font-semibold text-[#1B1B1B] mb-3">
-            Budík záloh
-          </Text>
-
-          {/* Gauge visualization */}
-          <View className="items-center mb-4">
-            <View
-              className="w-32 h-32 rounded-full items-center justify-center border-8"
-              style={{ borderColor: advanceColor }}
-            >
-              <Text className="text-2xl font-bold text-[#1B1B1B]">
-                {formatCurrency(advance.monthlyAdvance)}
-              </Text>
-              <Text className="text-xs text-[#6B7280]">/měsíc</Text>
-            </View>
-          </View>
-
-          <View
-            className="rounded-xl p-3 mb-3"
-            style={{ backgroundColor: advanceBg }}
-          >
-            <View className="flex-row items-center">
-              <Ionicons
-                name={
-                  advance.status === 'OPTIMAL'
-                    ? 'checkmark-circle'
-                    : advance.status === 'TOO_LOW'
-                      ? 'arrow-down-circle'
-                      : 'arrow-up-circle'
-                }
-                size={20}
-                color={advanceColor}
-              />
-              <Text
-                className="ml-2 text-sm font-medium"
-                style={{ color: advanceColor }}
-              >
-                {advanceLabel}
-              </Text>
-            </View>
-            {advance.status !== 'OPTIMAL' && (
-              <Text className="text-xs text-[#6B7280] mt-1 ml-7">
-                Doporučená záloha: {formatCurrency(advance.recommendedAdvance)}
-                /měsíc
-              </Text>
-            )}
-          </View>
-
-          <TouchableOpacity className="bg-[#00A651] rounded-xl py-3 items-center">
-            <Text className="text-white text-sm font-semibold">
-              Změnit zálohy
-            </Text>
-          </TouchableOpacity>
+      {/* Insights / anomaly */}
+      {insights && Math.abs(insights.change) >= 15 && (
+        <View className="px-5 mt-4">
+          <Alert
+            tone={insights.change > 0 ? 'warning' : 'success'}
+            icon={insights.change > 0 ? 'trending-up' : 'trending-down'}
+            title={
+              insights.change > 0
+                ? `Spotřeba +${insights.change.toFixed(0)} % vs. průměr`
+                : `Šetříte ${Math.abs(insights.change).toFixed(0)} % oproti průměru`
+            }
+            message={
+              insights.change > 0
+                ? 'Spotřeba v posledním měsíci je výrazně vyšší než průměr. Zkontrolujte spotřebiče.'
+                : 'Skvělá práce — držíte spotřebu pod průměrem posledních měsíců.'
+            }
+          />
         </View>
       )}
 
-      {/* Consumption Chart */}
-      {monthlyData.length > 0 && (
-        <View className="bg-white mx-5 mt-4 rounded-2xl p-5 shadow-sm">
-          <Text className="text-sm font-semibold text-[#1B1B1B] mb-4">
-            Spotřeba — posledních 12 měsíců
-          </Text>
+      {/* Advance payment */}
+      {advance && (
+        <View className="px-5 mt-5">
+          <SectionHeader title="Měsíční zálohy" />
+          <Card padding="lg">
+            <View className="flex-row items-center mb-4">
+              <View className="flex-1">
+                <Text className="text-2xs text-ink-muted uppercase tracking-wider">
+                  Platíte
+                </Text>
+                <Text className="text-2xl font-bold text-ink mt-1">
+                  {formatCurrency(advance.monthlyAdvance)}
+                </Text>
+                <Text className="text-2xs text-ink-muted mt-0.5">/měsíc</Text>
+              </View>
+              <Badge label={advLabel} tone={advTone} />
+            </View>
 
-          <View className="flex-row items-end justify-between h-36">
-            {monthlyData.map((m, i) => {
-              const height = (m.value / maxMonthly) * 120;
-              const monthLabel = m.date.split('-')[1];
-              return (
-                <View key={i} className="items-center flex-1">
-                  <Text className="text-[9px] text-[#6B7280] mb-1">
-                    {m.value}
-                  </Text>
-                  <View
-                    className="w-4 rounded-t-sm"
-                    style={{
-                      height: Math.max(height, 4),
-                      backgroundColor:
-                        sp.type === 'ELECTRICITY'
-                          ? Colors.electricity
-                          : Colors.gas,
-                    }}
+            {advance.status !== 'OPTIMAL' && (
+              <View
+                className="rounded-xl p-3 mb-3"
+                style={{
+                  backgroundColor: advPalette.bg,
+                  borderWidth: 1,
+                  borderColor: advPalette.border,
+                }}
+              >
+                <View className="flex-row items-center">
+                  <Ionicons
+                    name={
+                      advance.status === 'TOO_LOW'
+                        ? 'arrow-up-circle'
+                        : 'arrow-down-circle'
+                    }
+                    size={18}
+                    color={advPalette.solid}
                   />
-                  <Text className="text-[9px] text-[#6B7280] mt-1">
-                    {monthLabel}
+                  <Text
+                    className="ml-2 text-xs font-semibold flex-1"
+                    style={{ color: advPalette.text }}
+                  >
+                    Doporučená záloha:{' '}
+                    {formatCurrency(advance.recommendedAdvance)}/měsíc
                   </Text>
                 </View>
-              );
-            })}
-          </View>
-          <Text className="text-xs text-[#6B7280] text-center mt-2">
-            {consumption?.monthly[0]?.unit === 'kWh' ? 'kWh' : 'm³'} / měsíc
-          </Text>
+              </View>
+            )}
+
+            <Button
+              label="Změnit zálohy"
+              icon="cash-outline"
+              variant={advance.status === 'OPTIMAL' ? 'secondary' : 'primary'}
+              fullWidth
+            />
+          </Card>
         </View>
       )}
 
-      {/* Quick Actions */}
-      <View className="flex-row mx-5 mt-4 mb-6 gap-3">
-        <TouchableOpacity className="flex-1 bg-white rounded-2xl p-4 items-center shadow-sm">
-          <Ionicons name="speedometer-outline" size={24} color="#00A651" />
-          <Text className="text-xs text-[#1B1B1B] font-medium mt-2 text-center">
-            Zadat samoodečet
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="flex-1 bg-white rounded-2xl p-4 items-center shadow-sm">
-          <Ionicons name="cash-outline" size={24} color="#3B82F6" />
-          <Text className="text-xs text-[#1B1B1B] font-medium mt-2 text-center">
-            Změnit zálohy
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity className="flex-1 bg-white rounded-2xl p-4 items-center shadow-sm">
-          <Ionicons name="document-text-outline" size={24} color="#F59E0B" />
-          <Text className="text-xs text-[#1B1B1B] font-medium mt-2 text-center">
-            Detail smlouvy
-          </Text>
-        </TouchableOpacity>
+      {/* Monthly consumption */}
+      {monthly.length > 0 && (
+        <View className="px-5 mt-5">
+          <SectionHeader title="Spotřeba — 12 měsíců" />
+          <Card padding="lg">
+            <View className="flex-row mb-4">
+              <View className="flex-1">
+                <Text className="text-2xs text-ink-muted">Tento měsíc</Text>
+                <Text className="text-base font-bold text-ink mt-0.5">
+                  {monthly[monthly.length - 1].value}{' '}
+                  {monthly[monthly.length - 1].unit}
+                </Text>
+              </View>
+              {insights?.yoyChange !== null &&
+                insights?.yoyChange !== undefined && (
+                  <View className="flex-1">
+                    <Text className="text-2xs text-ink-muted">
+                      Rok meziročně
+                    </Text>
+                    <Text
+                      className="text-base font-bold mt-0.5"
+                      style={{
+                        color:
+                          insights.yoyChange > 0 ? Colors.red : Colors.primary,
+                      }}
+                    >
+                      {insights.yoyChange > 0 ? '+' : ''}
+                      {insights.yoyChange.toFixed(0)} %
+                    </Text>
+                  </View>
+                )}
+              <View className="flex-1">
+                <Text className="text-2xs text-ink-muted">Roční celkem</Text>
+                <Text className="text-base font-bold text-ink mt-0.5">
+                  {monthly.reduce((s, m) => s + m.value, 0)} {monthly[0].unit}
+                </Text>
+              </View>
+            </View>
+
+            <View className="flex-row items-end h-32 gap-1">
+              {monthly.map((m, i) => {
+                const h = (m.value / maxMonthly) * 100;
+                const monthIdx = parseInt(m.date.split('-')[1], 10) - 1;
+                const isLast = i === monthly.length - 1;
+                return (
+                  <View key={i} className="flex-1 items-center">
+                    <View
+                      style={{
+                        height: 100,
+                        width: '100%',
+                        justifyContent: 'flex-end',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: '70%',
+                          height: Math.max(h, 3),
+                          borderRadius: 4,
+                          backgroundColor: isLast
+                            ? energyColor
+                            : energyColor + 'A0',
+                        }}
+                      />
+                    </View>
+                    <Text
+                      className={`text-2xs mt-1 ${
+                        isLast ? 'font-bold text-ink' : 'text-ink-muted'
+                      }`}
+                    >
+                      {MONTH_NAMES[monthIdx]}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </Card>
+        </View>
+      )}
+
+      {/* Quick actions */}
+      <View className="px-5 mt-5">
+        <SectionHeader title="Akce" />
+        <View className="flex-row gap-3">
+          <View className="flex-1">
+            <Pressable onPress={() => router.push('/meter-reading' as any)}>
+              {({ pressed }) => (
+                <Card padding="md" style={{ opacity: pressed ? 0.85 : 1 }}>
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center mb-2"
+                    style={{ backgroundColor: Colors.primaryLight }}
+                  >
+                    <Ionicons
+                      name="speedometer-outline"
+                      size={20}
+                      color={Colors.primary}
+                    />
+                  </View>
+                  <Text className="text-sm font-semibold text-ink">
+                    Samoodečet
+                  </Text>
+                  <Text className="text-2xs text-ink-muted mt-0.5">
+                    Naskenujte měřič
+                  </Text>
+                </Card>
+              )}
+            </Pressable>
+          </View>
+          <View className="flex-1">
+            <Pressable
+              onPress={() =>
+                contract && router.push(`/contracts/${contract.id}` as any)
+              }
+            >
+              {({ pressed }) => (
+                <Card padding="md" style={{ opacity: pressed ? 0.85 : 1 }}>
+                  <View
+                    className="w-10 h-10 rounded-xl items-center justify-center mb-2"
+                    style={{ backgroundColor: '#DBEAFE' }}
+                  >
+                    <Ionicons
+                      name="document-text-outline"
+                      size={20}
+                      color={Colors.electricity}
+                    />
+                  </View>
+                  <Text className="text-sm font-semibold text-ink">
+                    Detail smlouvy
+                  </Text>
+                  <Text className="text-2xs text-ink-muted mt-0.5">
+                    Cena, fixace
+                  </Text>
+                </Card>
+              )}
+            </Pressable>
+          </View>
+        </View>
       </View>
     </ScrollView>
   );

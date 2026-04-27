@@ -1,8 +1,15 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/colors';
+
+const hapticTabPress = () => {
+  if (Platform.OS !== 'web') {
+    Haptics.selectionAsync().catch(() => {});
+  }
+};
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -10,6 +17,9 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      screenListeners={{
+        tabPress: hapticTabPress,
+      }}
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textMuted,

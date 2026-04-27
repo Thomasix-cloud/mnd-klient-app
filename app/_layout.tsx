@@ -64,6 +64,14 @@ export default function RootLayout() {
             headerTintColor: '#00A651',
           }}
         />
+        <Stack.Screen
+          name="meter-reading"
+          options={{
+            headerShown: true,
+            title: 'Samoodečet',
+            headerTintColor: '#00A651',
+          }}
+        />
       </Stack>
     </ErrorBoundary>
   );

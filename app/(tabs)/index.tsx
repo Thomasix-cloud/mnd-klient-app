@@ -8,7 +8,7 @@ import { mockSupplyPoints } from '@/data/mock-supply-points';
 import { mockInvoices } from '@/data/mock-invoices';
 import { mockNotifications } from '@/data/mock-notifications';
 import { mockConsumption } from '@/data/mock-consumption';
-import { Colors } from '@/constants/colors';
+import { Colors, Tones } from '@/constants/colors';
 import {
   formatCurrency,
   getGreeting,
@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/Badge';
 import { ConsumptionChart } from '@/components/ui/ConsumptionChart';
 import { EnergyAvatar } from '@/components/ui/EnergyAvatar';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { getUserInsights } from '@/utils/insights';
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
@@ -35,6 +36,7 @@ const QUICK_ACTIONS: QuickAction[] = [
     icon: 'speedometer-outline',
     label: 'Samoodečet',
     tone: 'brand',
+    route: '/meter-reading',
   },
   {
     icon: 'cash-outline',
@@ -48,9 +50,10 @@ const QUICK_ACTIONS: QuickAction[] = [
     route: '/calculator',
   },
   {
-    icon: 'call-outline',
-    label: 'Kontakt',
+    icon: 'chatbubble-ellipses-outline',
+    label: 'Zeptat se asistenta',
     tone: 'neutral',
+    route: '/(tabs)/assistant',
   },
 ];
 
@@ -84,6 +87,15 @@ export default function DashboardScreen() {
       prev7: all.slice(-14, -7),
     };
   }, [sp1Consumption]);
+
+  // Smart insights derived from user data (excludes overdue — already in alert)
+  const insights = useMemo(
+    () =>
+      getUserInsights()
+        .filter((i) => i.id !== 'overdue')
+        .slice(0, 3),
+    [],
+  );
 
   const initials = `${user?.firstName?.[0] ?? ''}${user?.lastName?.[0] ?? ''}`;
 
@@ -183,6 +195,88 @@ export default function DashboardScreen() {
           </View>
         </Card>
       </View>
+
+      {/* ========== SMART INSIGHTS ========== */}
+      {insights.length > 0 && (
+        <View className="mb-6">
+          <View className="px-5">
+            <SectionHeader
+              title="Pro vás"
+              actionLabel="Asistent"
+              onActionPress={() => router.push('/(tabs)/assistant' as any)}
+            />
+          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 20, paddingRight: 8 }}
+          >
+            {insights.map((ins) => {
+              const c = Tones[ins.tone];
+              return (
+                <Pressable
+                  key={ins.id}
+                  onPress={() => {
+                    if (ins.cta?.route) router.push(ins.cta.route as any);
+                  }}
+                  style={{ width: 280, marginRight: 12 }}
+                >
+                  {({ pressed }) => (
+                    <View
+                      className="rounded-2xl p-4"
+                      style={{
+                        backgroundColor: c.bg,
+                        borderWidth: 1,
+                        borderColor: c.border,
+                        opacity: pressed ? 0.85 : 1,
+                      }}
+                    >
+                      <View className="flex-row items-center mb-2">
+                        <View
+                          className="w-8 h-8 rounded-full items-center justify-center mr-2"
+                          style={{ backgroundColor: c.solid }}
+                        >
+                          <Ionicons name={ins.icon} size={16} color="#fff" />
+                        </View>
+                        <Text
+                          className="text-sm font-bold flex-1"
+                          style={{ color: c.text }}
+                          numberOfLines={1}
+                        >
+                          {ins.title}
+                        </Text>
+                      </View>
+                      <Text
+                        className="text-xs leading-4"
+                        style={{ color: c.text, opacity: 0.85 }}
+                        numberOfLines={3}
+                      >
+                        {ins.message}
+                      </Text>
+                      {ins.cta && (
+                        <View className="flex-row items-center mt-3">
+                          <Text
+                            className="text-xs font-bold"
+                            style={{ color: c.text }}
+                          >
+                            {ins.cta.label}
+                          </Text>
+                          <Ionicons
+                            name="arrow-forward"
+                            size={12}
+                            color={c.text}
+                            style={{ marginLeft: 4 }}
+                          />
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       {/* ========== QUICK ACTIONS (2x2) ========== */}
       <View className="px-5 mb-6">
