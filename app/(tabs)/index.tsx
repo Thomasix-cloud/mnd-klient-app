@@ -66,7 +66,9 @@ export default function DashboardScreen() {
       {overdueInvoices.length > 0 && (
         <TouchableOpacity
           className="mx-5 mb-4 bg-[#FEE2E2] border border-[#EF4444] rounded-xl p-4 flex-row items-center"
-          onPress={() => router.push('/invoices/' + overdueInvoices[0].id)}
+          onPress={() =>
+            router.push(`/invoices/${overdueInvoices[0].id}` as any)
+          }
         >
           <View className="w-10 h-10 rounded-full bg-[#EF4444] items-center justify-center mr-3">
             <Ionicons name="warning" size={20} color="white" />
