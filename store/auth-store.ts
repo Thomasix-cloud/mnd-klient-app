@@ -12,8 +12,9 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   user: null,
-  login: (_email: string, _password: string) => {
-    // Mock login — any credentials work
+  login: (email: string, password: string) => {
+    // TODO: Replace with real API authentication
+    if (!email.trim() || !password.trim()) return false;
     set({ isAuthenticated: true, user: mockUser });
     return true;
   },

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -22,9 +22,17 @@ export default function AssistantScreen() {
     },
   ]);
   const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sendMessage = (text: string) => {
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  const sendMessage = useCallback((text: string) => {
     if (!text.trim()) return;
 
     const userMsg: ChatMessage = {
@@ -36,19 +44,32 @@ export default function AssistantScreen() {
 
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setIsTyping(true);
 
     // Simulate AI response delay
-    setTimeout(() => {
-      const response = getAssistantResponse(text);
-      const botMsg: ChatMessage = {
-        id: `b-${Date.now()}`,
-        text: response,
-        isUser: false,
-        timestamp: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, botMsg]);
+    timerRef.current = setTimeout(() => {
+      try {
+        const response = getAssistantResponse(text);
+        const botMsg: ChatMessage = {
+          id: `b-${Date.now()}`,
+          text: response,
+          isUser: false,
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, botMsg]);
+      } catch {
+        const errorMsg: ChatMessage = {
+          id: `e-${Date.now()}`,
+          text: 'Omlouvám se, došlo k chybě. Zkuste to prosím znovu.',
+          isUser: false,
+          timestamp: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+      } finally {
+        setIsTyping(false);
+      }
     }, 600);
-  };
+  }, []);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -58,24 +79,29 @@ export default function AssistantScreen() {
     }
   }, [messages]);
 
-  const renderMessage = ({ item }: { item: ChatMessage }) => (
-    <View className={`mx-4 mb-3 ${item.isUser ? 'items-end' : 'items-start'}`}>
+  const renderMessage = useCallback(
+    ({ item }: { item: ChatMessage }) => (
       <View
-        className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-          item.isUser
-            ? 'bg-[#00A651] rounded-br-md'
-            : 'bg-white rounded-bl-md shadow-sm'
-        }`}
+        className={`mx-4 mb-3 ${item.isUser ? 'items-end' : 'items-start'}`}
       >
-        <Text
-          className={`text-sm leading-5 ${
-            item.isUser ? 'text-white' : 'text-[#1B1B1B]'
+        <View
+          className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+            item.isUser
+              ? 'bg-[#00A651] rounded-br-md'
+              : 'bg-white rounded-bl-md shadow-sm'
           }`}
         >
-          {item.text}
-        </Text>
+          <Text
+            className={`text-sm leading-5 ${
+              item.isUser ? 'text-white' : 'text-[#1B1B1B]'
+            }`}
+          >
+            {item.text}
+          </Text>
+        </View>
       </View>
-    </View>
+    ),
+    [],
   );
 
   return (
@@ -121,21 +147,26 @@ export default function AssistantScreen() {
           </Text>
           <View className="flex-row gap-2">
             {[
-              { icon: 'flame', label: 'Plyn', color: '#F59E0B', bg: '#FEF3C7' },
               {
-                icon: 'flash',
+                icon: 'flame' as const,
+                label: 'Plyn',
+                color: '#F59E0B',
+                bg: '#FEF3C7',
+              },
+              {
+                icon: 'flash' as const,
                 label: 'Elektřina',
                 color: '#3B82F6',
                 bg: '#DBEAFE',
               },
               {
-                icon: 'help-circle',
+                icon: 'help-circle' as const,
                 label: 'Reklamace',
                 color: '#EF4444',
                 bg: '#FEE2E2',
               },
               {
-                icon: 'document-text',
+                icon: 'document-text' as const,
                 label: 'Smlouvy',
                 color: '#00A651',
                 bg: '#E8F5E9',
@@ -147,7 +178,7 @@ export default function AssistantScreen() {
                 style={{ backgroundColor: cat.bg }}
                 onPress={() => sendMessage(`Mám dotaz ohledně: ${cat.label}`)}
               >
-                <Ionicons name={cat.icon as any} size={22} color={cat.color} />
+                <Ionicons name={cat.icon} size={22} color={cat.color} />
                 <Text
                   className="text-xs font-medium mt-1"
                   style={{ color: cat.color }}
@@ -174,8 +205,8 @@ export default function AssistantScreen() {
         <TouchableOpacity
           className="ml-2 w-11 h-11 rounded-full bg-[#00A651] items-center justify-center"
           onPress={() => sendMessage(input)}
-          disabled={!input.trim()}
-          style={{ opacity: input.trim() ? 1 : 0.5 }}
+          disabled={!input.trim() || isTyping}
+          style={{ opacity: input.trim() && !isTyping ? 1 : 0.5 }}
         >
           <Ionicons name="send" size={18} color="white" />
         </TouchableOpacity>

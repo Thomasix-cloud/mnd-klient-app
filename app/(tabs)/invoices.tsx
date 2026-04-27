@@ -9,6 +9,8 @@ import {
   formatDate,
   getEnergyTypeIcon,
   getEnergyTypeLabel,
+  getInvoiceStatusColor,
+  getInvoiceStatusLabel,
 } from '@/utils/format';
 import { Invoice, InvoiceStatus } from '@/types';
 
@@ -34,31 +36,9 @@ export default function InvoicesScreen() {
   const getSupplyPoint = (spId: string) =>
     mockSupplyPoints.find((sp) => sp.id === spId);
 
-  const getStatusColor = (status: InvoiceStatus) => {
-    switch (status) {
-      case 'PAID':
-        return { bg: '#E8F5E9', text: '#00A651' };
-      case 'UNPAID':
-        return { bg: '#FEF3C7', text: '#F59E0B' };
-      case 'OVERDUE':
-        return { bg: '#FEE2E2', text: '#EF4444' };
-    }
-  };
-
-  const getStatusLabel = (status: InvoiceStatus) => {
-    switch (status) {
-      case 'PAID':
-        return 'Zaplaceno';
-      case 'UNPAID':
-        return 'Nezaplaceno';
-      case 'OVERDUE':
-        return 'Po splatnosti';
-    }
-  };
-
   const renderInvoice = ({ item }: { item: Invoice }) => {
     const sp = getSupplyPoint(item.supplyPointId);
-    const statusStyle = getStatusColor(item.status);
+    const statusStyle = getInvoiceStatusColor(item.status);
     return (
       <TouchableOpacity
         className="bg-white rounded-2xl p-4 mx-5 mb-3 shadow-sm"
@@ -74,7 +54,7 @@ export default function InvoicesScreen() {
               }}
             >
               <Ionicons
-                name={sp ? (getEnergyTypeIcon(sp.type) as any) : 'receipt'}
+                name={sp ? getEnergyTypeIcon(sp.type) : 'receipt'}
                 size={18}
                 color={sp?.type === 'ELECTRICITY' ? '#3B82F6' : '#F59E0B'}
               />
@@ -97,7 +77,7 @@ export default function InvoicesScreen() {
               className="text-xs font-medium"
               style={{ color: statusStyle.text }}
             >
-              {getStatusLabel(item.status)}
+              {getInvoiceStatusLabel(item.status)}
             </Text>
           </View>
         </View>

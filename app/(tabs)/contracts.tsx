@@ -8,6 +8,7 @@ import {
   getEnergyTypeIcon,
   getEnergyTypeLabel,
   getFixationLabel,
+  getFixationColor,
   formatCurrency,
   formatDate,
 } from '@/utils/format';
@@ -19,17 +20,6 @@ export default function ContractsScreen() {
 
   const getSupplyPoint = (spId: string) =>
     mockSupplyPoints.find((sp) => sp.id === spId);
-
-  const getFixationColor = (type: 'FIXED' | 'DECLINING' | 'NONE') => {
-    switch (type) {
-      case 'FIXED':
-        return { bg: '#E8F5E9', text: '#00A651' };
-      case 'DECLINING':
-        return { bg: '#DBEAFE', text: '#3B82F6' };
-      case 'NONE':
-        return { bg: '#FEF3C7', text: '#F59E0B' };
-    }
-  };
 
   const renderContract = ({ item }: { item: Contract }) => {
     const sp = getSupplyPoint(item.supplyPointId);
@@ -52,7 +42,7 @@ export default function ContractsScreen() {
               }}
             >
               <Ionicons
-                name={getEnergyTypeIcon(item.type) as any}
+                name={getEnergyTypeIcon(item.type)}
                 size={22}
                 color={
                   item.type === 'ELECTRICITY' ? Colors.electricity : Colors.gas

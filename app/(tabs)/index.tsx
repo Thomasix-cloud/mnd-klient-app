@@ -24,8 +24,11 @@ export default function DashboardScreen() {
   );
   const overdueInvoices = mockInvoices.filter((i) => i.status === 'OVERDUE');
   const totalUnpaid = unpaidInvoices.reduce((sum, i) => sum + i.amount, 0);
+  const currentMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const totalMonthly = mockInvoices
-    .filter((i) => i.type === 'ADVANCE' && i.period.from.startsWith('2026-04'))
+    .filter(
+      (i) => i.type === 'ADVANCE' && i.period.from.startsWith(currentMonth),
+    )
     .reduce((sum, i) => sum + i.amount, 0);
 
   const unreadNotifications = mockNotifications.filter((n) => !n.read);
@@ -145,7 +148,7 @@ export default function DashboardScreen() {
               }}
             >
               <Ionicons
-                name={getEnergyTypeIcon(sp.type) as any}
+                name={getEnergyTypeIcon(sp.type)}
                 size={22}
                 color={
                   sp.type === 'ELECTRICITY' ? Colors.electricity : Colors.gas
@@ -218,37 +221,44 @@ export default function DashboardScreen() {
           Rychlé akce
         </Text>
         <View className="flex-row gap-3">
-          {[
-            {
-              icon: 'speedometer-outline',
-              label: 'Samoodečet',
-              color: '#00A651',
-            },
-            { icon: 'cash-outline', label: 'Změnit zálohy', color: '#3B82F6' },
-            {
-              icon: 'calculator-outline',
-              label: 'Kalkulačka',
-              color: '#F59E0B',
-              route: '/calculator',
-            },
-            { icon: 'call-outline', label: 'Kontakt', color: '#6B7280' },
-          ].map((action, i) => (
+          {(
+            [
+              {
+                icon: 'speedometer-outline' as const,
+                label: 'Samoodečet',
+                color: '#00A651',
+              },
+              {
+                icon: 'cash-outline' as const,
+                label: 'Změnit zálohy',
+                color: '#3B82F6',
+              },
+              {
+                icon: 'calculator-outline' as const,
+                label: 'Kalkulačka',
+                color: '#F59E0B',
+                route: '/calculator',
+              },
+              {
+                icon: 'call-outline' as const,
+                label: 'Kontakt',
+                color: '#6B7280',
+              },
+            ] as const
+          ).map((action, i) => (
             <TouchableOpacity
               key={i}
               className="flex-1 bg-white rounded-2xl p-3 items-center shadow-sm"
               onPress={() => {
-                if (action.route) router.push(action.route as any);
+                if ('route' in action && action.route)
+                  router.push(action.route as any);
               }}
             >
               <View
                 className="w-10 h-10 rounded-full items-center justify-center mb-1.5"
                 style={{ backgroundColor: action.color + '15' }}
               >
-                <Ionicons
-                  name={action.icon as any}
-                  size={20}
-                  color={action.color}
-                />
+                <Ionicons name={action.icon} size={20} color={action.color} />
               </View>
               <Text className="text-[11px] text-[#1B1B1B] font-medium text-center">
                 {action.label}
@@ -294,7 +304,7 @@ export default function DashboardScreen() {
                       ? 'receipt'
                       : n.type === 'PRICE_CHANGE'
                         ? 'trending-up'
-                        : ('information-circle' as any)
+                        : 'information-circle'
                 }
                 size={16}
                 color={

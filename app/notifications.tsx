@@ -4,8 +4,12 @@ import { mockNotifications } from '@/data/mock-notifications';
 import { formatDate } from '@/utils/format';
 import { Notification as AppNotification } from '@/types';
 
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
 export default function NotificationsScreen() {
-  const getTypeConfig = (type: AppNotification['type']) => {
+  const getTypeConfig = (
+    type: AppNotification['type'],
+  ): { icon: IconName; color: string; bg: string } => {
     switch (type) {
       case 'OVERDUE_WARNING':
         return { icon: 'warning', color: '#EF4444', bg: '#FEE2E2' };
@@ -34,7 +38,7 @@ export default function NotificationsScreen() {
           className="w-10 h-10 rounded-full items-center justify-center mr-3 mt-0.5"
           style={{ backgroundColor: config.bg }}
         >
-          <Ionicons name={config.icon as any} size={20} color={config.color} />
+          <Ionicons name={config.icon} size={20} color={config.color} />
         </View>
         <View className="flex-1">
           <View className="flex-row items-center justify-between">

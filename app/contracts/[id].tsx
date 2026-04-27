@@ -10,6 +10,7 @@ import {
   getEnergyTypeIcon,
   getEnergyTypeLabel,
   getFixationLabel,
+  getFixationColor,
   formatEAN,
 } from '@/utils/format';
 
@@ -28,16 +29,15 @@ export default function ContractDetailScreen() {
     );
   }
 
-  const getFixationColor = (type: 'FIXED' | 'DECLINING' | 'NONE') => {
-    switch (type) {
-      case 'FIXED':
-        return { bg: '#E8F5E9', text: '#00A651' };
-      case 'DECLINING':
-        return { bg: '#DBEAFE', text: '#3B82F6' };
-      case 'NONE':
-        return { bg: '#FEF3C7', text: '#F59E0B' };
-    }
-  };
+  if (!sp) {
+    return (
+      <View className="flex-1 items-center justify-center bg-[#F5F5F5]">
+        <Text className="text-[#6B7280]">
+          Odběrné místo pro smlouvu nenalezeno
+        </Text>
+      </View>
+    );
+  }
 
   const fixStyle = getFixationColor(contract.fixation.type);
 
@@ -54,7 +54,7 @@ export default function ContractDetailScreen() {
             }}
           >
             <Ionicons
-              name={getEnergyTypeIcon(contract.type) as any}
+              name={getEnergyTypeIcon(contract.type)}
               size={28}
               color={
                 contract.type === 'ELECTRICITY'
@@ -67,7 +67,7 @@ export default function ContractDetailScreen() {
             <Text className="text-lg font-bold text-[#1B1B1B]">
               {getEnergyTypeLabel(contract.type)}
             </Text>
-            <Text className="text-sm text-[#6B7280]">{sp?.contractNumber}</Text>
+            <Text className="text-sm text-[#6B7280]">{sp.contractNumber}</Text>
           </View>
           <View
             className="rounded-full px-3 py-1"
@@ -136,11 +136,11 @@ export default function ContractDetailScreen() {
         {[
           {
             label: 'Odběrné místo',
-            value: sp ? `${sp.address.street}, ${sp.address.city}` : '-',
+            value: `${sp.address.street}, ${sp.address.city}`,
           },
           {
-            label: sp?.type === 'ELECTRICITY' ? 'EAN' : 'EIC',
-            value: sp ? formatEAN(sp.identifier) : '-',
+            label: sp.type === 'ELECTRICITY' ? 'EAN' : 'EIC',
+            value: formatEAN(sp.identifier),
           },
           { label: 'Začátek smlouvy', value: formatDate(contract.startDate) },
           ...(contract.endDate

@@ -25,26 +25,28 @@ export default function InvoiceDetailScreen() {
     );
   }
 
-  const statusConfig = {
-    PAID: {
-      bg: '#E8F5E9',
-      text: '#00A651',
-      label: 'Zaplaceno',
-      icon: 'checkmark-circle',
-    },
-    UNPAID: {
-      bg: '#FEF3C7',
-      text: '#F59E0B',
-      label: 'Nezaplaceno',
-      icon: 'time',
-    },
-    OVERDUE: {
-      bg: '#FEE2E2',
-      text: '#EF4444',
-      label: 'Po splatnosti',
-      icon: 'warning',
-    },
-  }[invoice.status];
+  const statusConfig = (
+    {
+      PAID: {
+        bg: '#E8F5E9',
+        text: '#00A651',
+        label: 'Zaplaceno',
+        icon: 'checkmark-circle' as const,
+      },
+      UNPAID: {
+        bg: '#FEF3C7',
+        text: '#F59E0B',
+        label: 'Nezaplaceno',
+        icon: 'time' as const,
+      },
+      OVERDUE: {
+        bg: '#FEE2E2',
+        text: '#EF4444',
+        label: 'Po splatnosti',
+        icon: 'warning' as const,
+      },
+    } as const
+  )[invoice.status];
 
   return (
     <ScrollView className="flex-1 bg-[#F5F5F5]">
@@ -54,7 +56,7 @@ export default function InvoiceDetailScreen() {
         style={{ backgroundColor: statusConfig.bg }}
       >
         <Ionicons
-          name={statusConfig.icon as any}
+          name={statusConfig.icon}
           size={40}
           color={statusConfig.text}
         />

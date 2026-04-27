@@ -29,7 +29,12 @@ export default function CalculatorScreen() {
   const [results, setResults] = useState<PriceResult[] | null>(null);
 
   const calculate = () => {
-    const mwh = parseFloat(consumption) || 0;
+    const mwh = parseFloat(consumption);
+
+    if (isNaN(mwh) || mwh <= 0 || mwh > 1000) {
+      setResults(null);
+      return;
+    }
 
     if (energyType === 'ELECTRICITY') {
       setResults([

@@ -13,14 +13,24 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/auth-store';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('jan.dvorak@email.cz');
-  const [password, setPassword] = useState('demo1234');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
   const login = useAuthStore((s) => s.login);
 
   const handleLogin = () => {
-    login(email, password);
-    router.replace('/(tabs)');
+    setError('');
+    if (!email.trim() || !password.trim()) {
+      setError('Vyplňte prosím e-mail a heslo.');
+      return;
+    }
+    const success = login(email, password);
+    if (success) {
+      router.replace('/(tabs)');
+    } else {
+      setError('Neplatné přihlašovací údaje.');
+    }
   };
 
   return (
@@ -88,6 +98,11 @@ export default function LoginScreen() {
           </View>
 
           {/* Forgot password */}
+          {error ? (
+            <Text className="text-[#EF4444] text-sm mb-4 text-center">
+              {error}
+            </Text>
+          ) : null}
           <TouchableOpacity className="self-end mb-8">
             <Text className="text-[#00A651] text-sm font-medium">
               Zapomenuté heslo?

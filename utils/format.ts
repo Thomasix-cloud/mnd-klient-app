@@ -41,8 +41,8 @@ export function getEnergyTypeLabel(type: "ELECTRICITY" | "GAS"): string {
   return type === "ELECTRICITY" ? "Elektřina" : "Plyn";
 }
 
-export function getEnergyTypeIcon(type: "ELECTRICITY" | "GAS"): string {
-  return type === "ELECTRICITY" ? "flash" : "flame";
+export function getEnergyTypeIcon(type: "ELECTRICITY" | "GAS") {
+  return type === "ELECTRICITY" ? ("flash" as const) : ("flame" as const);
 }
 
 export function getInvoiceStatusLabel(
@@ -68,5 +68,31 @@ export function getFixationLabel(
       return "Klesající ceník";
     case "NONE":
       return "Bez fixace";
+  }
+}
+
+export function getInvoiceStatusColor(
+  status: "PAID" | "UNPAID" | "OVERDUE"
+): { bg: string; text: string } {
+  switch (status) {
+    case "PAID":
+      return { bg: "#E8F5E9", text: "#00A651" };
+    case "UNPAID":
+      return { bg: "#FEF3C7", text: "#F59E0B" };
+    case "OVERDUE":
+      return { bg: "#FEE2E2", text: "#EF4444" };
+  }
+}
+
+export function getFixationColor(
+  type: "FIXED" | "DECLINING" | "NONE"
+): { bg: string; text: string } {
+  switch (type) {
+    case "FIXED":
+      return { bg: "#E8F5E9", text: "#00A651" };
+    case "DECLINING":
+      return { bg: "#DBEAFE", text: "#3B82F6" };
+    case "NONE":
+      return { bg: "#FEF3C7", text: "#F59E0B" };
   }
 }

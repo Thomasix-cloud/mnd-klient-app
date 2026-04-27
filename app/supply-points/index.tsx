@@ -19,7 +19,7 @@ export default function SupplyPointsScreen() {
         }}
       >
         <Ionicons
-          name={getEnergyTypeIcon(item.type) as any}
+          name={getEnergyTypeIcon(item.type)}
           size={24}
           color={item.type === 'ELECTRICITY' ? Colors.electricity : Colors.gas}
         />

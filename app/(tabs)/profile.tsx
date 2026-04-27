@@ -5,6 +5,8 @@ import { useAuthStore } from '@/store/auth-store';
 import { formatDate } from '@/utils/format';
 import { mockNotifications } from '@/data/mock-notifications';
 
+type IconName = React.ComponentProps<typeof Ionicons>['name'];
+
 export default function ProfileScreen() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
@@ -16,7 +18,12 @@ export default function ProfileScreen() {
     router.replace('/login');
   };
 
-  const menuItems = [
+  const menuItems: {
+    icon: IconName;
+    label: string;
+    route: string | null;
+    badge: number | null;
+  }[] = [
     {
       icon: 'location-outline',
       label: 'Odběrná místa',
@@ -96,26 +103,36 @@ export default function ProfileScreen() {
           Osobní údaje
         </Text>
 
-        {[
-          {
-            icon: 'calendar-outline',
-            label: 'Datum narození',
-            value: user?.dateOfBirth ? formatDate(user.dateOfBirth) : '',
-          },
-          { icon: 'call-outline', label: 'Telefon', value: user?.phone },
-          { icon: 'mail-outline', label: 'E-mail', value: user?.email },
-          {
-            icon: 'location-outline',
-            label: 'Adresa',
-            value: `${user?.address.street}, ${user?.address.postalCode} ${user?.address.city}`,
-          },
-        ].map((item, i) => (
+        {(
+          [
+            {
+              icon: 'calendar-outline' as const,
+              label: 'Datum narození',
+              value: user?.dateOfBirth ? formatDate(user.dateOfBirth) : '',
+            },
+            {
+              icon: 'call-outline' as const,
+              label: 'Telefon',
+              value: user?.phone,
+            },
+            {
+              icon: 'mail-outline' as const,
+              label: 'E-mail',
+              value: user?.email,
+            },
+            {
+              icon: 'location-outline' as const,
+              label: 'Adresa',
+              value: `${user?.address.street}, ${user?.address.postalCode} ${user?.address.city}`,
+            },
+          ] as const
+        ).map((item, i) => (
           <View
             key={i}
             className="flex-row items-center py-3 border-b border-[#F5F5F5]"
           >
             <Ionicons
-              name={item.icon as any}
+              name={item.icon}
               size={18}
               color="#6B7280"
               style={{ marginRight: 12 }}
@@ -139,7 +156,7 @@ export default function ProfileScreen() {
             }}
           >
             <Ionicons
-              name={item.icon as any}
+              name={item.icon}
               size={20}
               color="#6B7280"
               style={{ marginRight: 12 }}
