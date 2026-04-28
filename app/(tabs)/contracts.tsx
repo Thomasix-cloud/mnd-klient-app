@@ -1,151 +1,134 @@
-import { useMemo } from 'react';
-import { View, Text, SectionList, Pressable } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { mockContracts } from '@/data/mock-contracts';
 import { mockSupplyPoints } from '@/data/mock-supply-points';
 import { Colors } from '@/constants/colors';
 import {
+  getEnergyTypeIcon,
   getEnergyTypeLabel,
   getFixationLabel,
+  getFixationColor,
   formatCurrency,
   formatDate,
 } from '@/utils/format';
-import { getFixationTone, getContractTone } from '@/utils/tones';
 import { Contract } from '@/types';
-import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { EnergyAvatar } from '@/components/ui/EnergyAvatar';
 
 export default function ContractsScreen() {
-  const sections = useMemo(() => {
-    const active = mockContracts.filter((c) => c.status === 'ACTIVE');
-    const pending = mockContracts.filter((c) => c.status === 'PENDING');
-    const terminated = mockContracts.filter((c) => c.status === 'TERMINATED');
-    const out: { title: string; data: Contract[] }[] = [];
-    if (active.length) out.push({ title: 'Aktivní', data: active });
-    if (pending.length) out.push({ title: 'Čekající', data: pending });
-    if (terminated.length) out.push({ title: 'Ukončené', data: terminated });
-    return out;
-  }, []);
+  const activeContracts = mockContracts.filter((c) => c.status === 'ACTIVE');
+  const pastContracts = mockContracts.filter((c) => c.status === 'TERMINATED');
 
   const getSupplyPoint = (spId: string) =>
     mockSupplyPoints.find((sp) => sp.id === spId);
 
   const renderContract = ({ item }: { item: Contract }) => {
     const sp = getSupplyPoint(item.supplyPointId);
+    const fixStyle = getFixationColor(item.fixation.type);
     const isTerminated = item.status === 'TERMINATED';
-    const fixTone = getFixationTone(item.fixation.type);
 
     return (
-      <Pressable
+      <TouchableOpacity
+        className="bg-white rounded-2xl p-4 mx-5 mb-3 shadow-sm"
+        style={{ opacity: isTerminated ? 0.6 : 1 }}
         onPress={() => router.push(`/contracts/${item.id}`)}
-        className="mx-5 mb-3"
       >
-        {({ pressed }) => (
-          <Card
-            style={{
-              opacity: isTerminated ? 0.6 : pressed ? 0.85 : 1,
-            }}
-          >
-            <View className="flex-row items-center justify-between mb-3">
-              <View className="flex-row items-center flex-1 min-w-0">
-                <EnergyAvatar type={item.type} size="md" />
-                <View className="ml-3 flex-1 min-w-0">
-                  <Text
-                    className="text-sm font-semibold text-ink"
-                    numberOfLines={1}
-                  >
-                    {getEnergyTypeLabel(item.type)}
-                  </Text>
-                  <Text className="text-xs text-ink-muted" numberOfLines={1}>
-                    {sp?.contractNumber}
-                  </Text>
-                </View>
-              </View>
-              <Badge
-                label={
-                  isTerminated
-                    ? 'Ukončena'
-                    : item.status === 'PENDING'
-                      ? 'Čekající'
-                      : 'Aktivní'
+        <View className="flex-row items-center justify-between mb-3">
+          <View className="flex-row items-center">
+            <View
+              className="w-11 h-11 rounded-full items-center justify-center mr-3"
+              style={{
+                backgroundColor:
+                  item.type === 'ELECTRICITY' ? '#DBEAFE' : '#FEF3C7',
+              }}
+            >
+              <Ionicons
+                name={getEnergyTypeIcon(item.type)}
+                size={22}
+                color={
+                  item.type === 'ELECTRICITY' ? Colors.electricity : Colors.gas
                 }
-                tone={getContractTone(item.status)}
               />
             </View>
+            <View>
+              <Text className="text-sm font-semibold text-[#1B1B1B]">
+                {getEnergyTypeLabel(item.type)}
+              </Text>
+              <Text className="text-xs text-[#6B7280]">
+                {sp?.contractNumber}
+              </Text>
+            </View>
+          </View>
+          {isTerminated ? (
+            <View className="bg-[#F5F5F5] rounded-full px-2.5 py-1">
+              <Text className="text-xs text-[#6B7280] font-medium">
+                Ukončena
+              </Text>
+            </View>
+          ) : (
+            <View className="bg-[#E8F5E9] rounded-full px-2.5 py-1">
+              <Text className="text-xs text-[#00A651] font-medium">
+                Aktivní
+              </Text>
+            </View>
+          )}
+        </View>
 
-            <Text className="text-sm text-ink mb-3" numberOfLines={2}>
-              {item.pricePlan}
+        {/* Price Plan */}
+        <Text className="text-sm text-[#1B1B1B] mb-2">{item.pricePlan}</Text>
+
+        {/* Fixation & Price */}
+        <View className="flex-row items-center gap-2 mb-2">
+          <View
+            className="rounded-full px-2.5 py-1"
+            style={{ backgroundColor: fixStyle.bg }}
+          >
+            <Text
+              className="text-xs font-medium"
+              style={{ color: fixStyle.text }}
+            >
+              {getFixationLabel(item.fixation.type)}
             </Text>
+          </View>
+          <Text className="text-xs text-[#6B7280]">
+            {formatCurrency(item.fixation.pricePerMWh)}/MWh
+          </Text>
+          {item.fixation.validUntil && (
+            <Text className="text-xs text-[#6B7280]">
+              do {formatDate(item.fixation.validUntil)}
+            </Text>
+          )}
+        </View>
 
-            <View className="flex-row flex-wrap items-center gap-2 mb-2">
-              <Badge
-                label={getFixationLabel(item.fixation.type)}
-                tone={fixTone}
-              />
-              <View className="flex-row items-center">
-                <Ionicons
-                  name="pricetag-outline"
-                  size={12}
-                  color={Colors.gray}
-                />
-                <Text className="text-xs text-ink-muted ml-1">
-                  {formatCurrency(item.fixation.pricePerMWh)}/MWh
+        {/* Business Opportunities */}
+        {item.businessOpportunities.length > 0 && (
+          <View className="flex-row gap-2 mt-1">
+            {item.businessOpportunities.map((opp, i) => (
+              <View key={i} className="bg-[#FEF3C7] rounded-full px-2.5 py-1">
+                <Text className="text-xs text-[#F59E0B] font-medium">
+                  💡 {opp}
                 </Text>
               </View>
-              {item.fixation.validUntil && (
-                <View className="flex-row items-center">
-                  <Ionicons
-                    name="calendar-outline"
-                    size={12}
-                    color={Colors.gray}
-                  />
-                  <Text className="text-xs text-ink-muted ml-1">
-                    do {formatDate(item.fixation.validUntil)}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            {item.businessOpportunities.length > 0 && !isTerminated && (
-              <View className="flex-row flex-wrap gap-2 mt-1 pt-3 border-t border-line-subtle">
-                {item.businessOpportunities.map((opp, i) => (
-                  <Badge key={i} label={opp} tone="warning" icon="bulb" />
-                ))}
-              </View>
-            )}
-          </Card>
+            ))}
+          </View>
         )}
-      </Pressable>
+      </TouchableOpacity>
     );
   };
 
   return (
-    <View className="flex-1 bg-surface">
-      <SectionList
-        sections={sections}
+    <View className="flex-1 bg-[#F5F5F5]">
+      <FlatList
+        data={[...activeContracts, ...pastContracts]}
         keyExtractor={(item) => item.id}
         renderItem={renderContract}
-        renderSectionHeader={({ section: { title, data } }) => (
-          <View className="px-5 pt-4 pb-2 flex-row items-baseline">
-            <Text className="text-xs font-bold text-ink-muted uppercase tracking-wider">
-              {title}
-            </Text>
-            <Text className="text-2xs text-ink-subtle ml-2">
-              ({data.length})
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 20 }}
+        ListHeaderComponent={
+          <View className="px-5 mb-2">
+            <Text className="text-xs text-[#6B7280]">
+              {activeContracts.length} aktivní
+              {activeContracts.length > 1 ? 'ch' : ''} smluv
             </Text>
           </View>
-        )}
-        contentContainerStyle={{ paddingBottom: 32 }}
-        stickySectionHeadersEnabled={false}
-        ListEmptyComponent={
-          <EmptyState
-            icon="document-text-outline"
-            title="Žádné smlouvy"
-            message="Aktuálně u nás nemáte žádnou smlouvu."
-          />
         }
       />
     </View>
